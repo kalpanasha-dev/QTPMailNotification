@@ -1,0 +1,318 @@
+Function funSendEmail()
+        If gsEmailNotification = "ON" Then
+
+                Const cdoSendUsingPickup = 1
+                Const cdoSendUsingPort = 2
+                Const cdoAnonymous = 0
+                ' Use basic (clear-text) authentication.
+                Const cdoBasic = 1
+                ' Use NTLM authentication
+                Const cdoNTLM = 2 'NTLM
+                
+                ' Create the message object.
+                Set objMessage = CreateObject("CDO.Message")
+                'Set the from address this would be your email address.
+                objMessage.From = gsEmailListFrom
+                ' Set the TO Address separate multiple address with a comma
+                objMessage.To = gsEmailListTo
+                objMessage.Cc = gsEmailListCc                
+                ' Set the Subject.
+                objMessage.Subject = gsEmailSubject & " - " & Environment("envsPlace")
+                ' Now for the Message Options Part.
+                ' Use standared text for the body.
+                objMessage.TextBody =  gsEmailBody
+                
+                ' Or you could use HTML as:
+                ' objMessage.HTMLBody = strHTML
+                
+                ' ATTACHMENT : Add an attachment Can be any valid url
+
+                Set fso = CreateObject("Scripting.FileSystemObject")
+'                Test Log
+'                Set folder = fso.GetFolder(gsFolderPath & "ExecutionLog")
+'                Set files = folder.Files
+'                
+'                For each folderIdx In files
+'                        objMessage.AddAttachment(folderIdx)
+'                Next
+                objMessage.AddAttachment(gsTestSummaryFilePath)
+
+'                Control file
+                objMessage.AddAttachment(gsDataFileSelect)
+                                
+'                TestCase File                
+                Set folder = fso.GetFolder(gsFolderPath & "AutomationTestCases")
+                Set files = folder.Files
+                
+                For each folderIdx In files
+                        objMessage.AddAttachment(folderIdx)
+                Next
+
+'                Response Time xls file
+                If  gsResponseTimeXlsPath = Empty Then
+                Else
+                        objMessage.AddAttachment(gsResponseTimeXlsPath)
+                End If
+                
+
+                Set folder = Nothing
+                Set folder = Nothing
+                Set files = Nothing
+    
+                
+                ' This section provides the configuration information for the SMTP server.
+                ' Specifie the method used to send messages.
+                objMessage.Configuration.Fields.Item _
+                ("http://schemas.microsoft.com/cdo/configuration/sendusing") = _
+                cdoSendUsingPort
+                
+                ' The name (DNS) or IP address of the machine
+                ' hosting the SMTP service through which
+                ' messages are to be sent.
+                objMessage.Configuration.Fields.Item _
+                ("http://schemas.microsoft.com/cdo/configuration/smtpserver") = _
+                "mail.xxxx.com" 
+                
+                ' Specify the authentication mechanism
+                ' to use.
+                objMessage.Configuration.Fields.Item _
+                ("http://schemas.microsoft.com/cdo/configuration/smtpauthenticate") = _
+                cdoBasic
+                
+                ' The username for authenticating to an SMTP server using basic (clear-text) authentication
+                objMessage.Configuration.Fields.Item _
+                ("http://schemas.microsoft.com/cdo/configuration/sendusername") = _
+                "Username"
+                
+                ' The password used to authenticate
+                ' to an SMTP server using authentication
+                objMessage.Configuration.Fields.Item _
+                ("http://schemas.microsoft.com/cdo/configuration/sendpassword") = _
+                "Password"
+                
+                ' The port on which the SMTP service
+                ' specified by the smtpserver field is
+                ' listening for connections (typically 25)
+                objMessage.Configuration.Fields.Item _
+                ("http://schemas.microsoft.com/cdo/configuration/smtpserverport") = _
+                25
+                
+                'Use SSL for the connection (False or True)
+                objMessage.Configuration.Fields.Item _
+                ("http://schemas.microsoft.com/cdo/configuration/smtpusessl") = _
+                False
+                
+                ' Set the number of seconds to wait for a valid socket to be established with the SMTP service before timing out.
+                objMessage.Configuration.Fields.Item _
+                ("http://schemas.microsoft.com/cdo/configuration/smtpconnectiontimeout") = _
+                60
+                
+                ' Update configuration
+                objMessage.Configuration.Fields.Update
+                
+                ' Use to show the message.
+'                 MsgBox objMessage.GetStream.ReadText
+
+
+                On Error Resume Next
+
+                ' Send the message.
+                objMessage.Send                
+
+'                Setting global message list to empty as we are appending the existing file
+                If  err.number = 0 Then
+                        sMessages =  "Email sent Successfully "
+                Else
+                        sMessages =  "***Email NOT sent Successfully"
+                End If
+
+                Call funMessages(sMessages)
+    
+                On Error Goto 0
+'                This will delete the test log and recreate again (Text file append is not working, generating write permission error) 
+                Call funCreateTestLog()      
+                
+                Set objMessage = Nothing
+            
+        End If
+   
+End Function
+
+
+
+
+
+'********************************************************************************
+'****************Script to send email with attachment using outlook****
+'********************************************************************************
+'Attachments
+strExecutionPlan = "C:\TEMP\ExecutionPlanV2.0.xls"
+strHtmlFile = "C:\TEMP\ExecutionPlanV2.0.html"
+
+'List of receipents
+strRecipient = "someone@gmail.com "
+
+'Email Subject
+strMailSubject = "Automated Email Notification : QTP Statement Script Execution Results"
+
+'Email Body
+stMessageBody ="This is a test message"
+
+Call SendEmail (stMessageBody , stMessageBody , Array (strExecutionPlan ,strHtmlFile) , strrecipient)
+
+Public Sub SendEmail(strsubject,stremailcontent,arrAttachements,strrecipient)
+Const olMailItem = 0
+Set OAPp = CreateObject("Outlook.Application")
+Set myItem = OApp.CreateItem(olMailItem)
+With myItem
+.To = strrecipient
+.Subject = strsubject & " : : " & now
+.BodyFormat = 2
+.HtmlBody = stremailcontent
+
+For each element in arrAttachements
+.Attachments.Add element
+Next
+
+wait 2 'adding attachements may take sometime
+
+.Display 'Display the email message but dont send otherwise security pop up will come up 
+End with
+
+Set oWin = Window("text:=Automated Email Notification : QTP Statement Script Execution Results : : SendEmail - .*")
+oWin.Activate
+SendKeys "%S"
+
+Set myItem = Nothing
+Set oWin = Nothing
+
+End Sub
+
+Function Sendkeys(Keystroke)
+Dim oShell,hwnd,title
+If Keystroke ="" Then
+Exit Function
+End If
+Set oShell = CreateObject("WScript.Shell") 
+Extern.Declare micHWnd, "GetForegroundWindow", "user32.dll", "GetForegroundWindow" 
+hwnd = Extern.GetForegroundWindow()
+title = Window("hwnd:=" & hwnd ).GetROProperty( "title" )
+oShell.AppActivate title
+oShell.SendKeys Keystroke
+Wait 0, 500
+
+Set oShell = Nothing
+End Function
+
+
+
+How do we send email from QTP ?
+Posted on August 8, 2008 by haripotter 
+We can send an email from a QTP testscript by using the below function. It uses CDO.Message object to perform that action. We use the SMTP Server to deliver the email message to the concerned email ID. Please update the values as per your environment. This function sends a email attachment to specified email address.
+
+Call this function as
+sendEmail(“c:\testreport.txt”, “myemail@mycompany.com”)
+Function sendEmail(reportfile,sendto)
+Set oMessage = CreateObject(“CDO.Message”)
+‘==This section provides the configuration information for the remote SMTP server.
+‘==Normally you will only change the server name or IP.
+oMessage.Configuration.Fields.Item _
+(“http://schemas.microsoft.com/cdo/configuration/sendusing&#8221;) = 2
+‘Name or IP of Remote SMTP Server
+oMessage.Configuration.Fields.Item _
+(“http://schemas.microsoft.com/cdo/configuration/smtpserver&#8221;) = “Your_smtp_server_name”
+‘Server port (typically 25)
+oMessage.Configuration.Fields.Item _
+(“http://schemas.microsoft.com/cdo/configuration/smtpserverport&#8221;) = 25
+oMessage.Configuration.Fields.Update
+oMessage.Subject = “Specify the subject here”
+oMessage.Sender = “Your email ID”
+oMessage.To = sendto
+oMessage.CC = “an email ID”
+oMessage.TextBody = “Please find the report attached” &vbcrlf & vbcrlf & “Thanks” & vbcrlf & “your name”
+oMessage.AddAttachment reportfile
+oMessage.Send
+Set oMessage = Nothing
+End Function
+Try this function
+
+Function SendMail(SendTo, Subject, Body, Attachment)
+Set ol=CreateObject("Outlook.Application")
+Set Mail=ol.CreateItem(0)
+Mail.to=SendTo
+Mail.Subject=Subject
+Mail.Body=Body
+If (Attachment <> "") Then
+Mail.Attachments.Add(Attachment)
+End If
+Mail.Send
+ol.Quit
+Set Mail = Nothing
+Set ol = Nothing
+End Function 
+
+''' use Raj's code above (#5) modifying this line
+If (Attachment <> "") Then
+Mail.Attachments.Add(Attachment)
+End If
+''' 
+
+set listattach = wildFileList(".*4.*jpg")
+
+
+for each n in listattach 
+Mail.Attachments.Add(n)
+next 'n
+
+Function wildFileList(regx) ', fext)
+'step 1 string list of filenames
+Dim fso, tmp, tmp1, folder, File, regEx, Match, Matches, n,
+fext
+fext = right(regx,3)
+Set fso = CreateObject("Scripting.FileSystemObject")
+Set folder = fso.getfolder(".")
+For Each File in folder.Files
+If fso.GetExtensionName(File)= fext Then 'regx & fext
+tmp = File & vbcrlf & tmp 'regx & fext & vbcrlf & tmp
+End If
+Next 
+'step 2 exec regex on raw string 
+Set regEx = New RegExp ' Create a regular expression.
+regEx.Pattern = regx ' Set pattern.
+regEx.IgnoreCase = True ' Set case insensitivity.
+regEx.Global = True ' Set global applicability.
+Set Matches = regEx.Execute(tmp) ' Execute search.
+set wildFileList = Matches
+
+
+Function SendMailOutlook(strMailto, Subject, Message, 
+strMailfrom)
+
+'Create an Outlook object
+Dim Outlook 'As New Outlook.Application
+Set Outlook = CreateObject("Outlook.Application")
+
+'Create e new message
+Dim Message 'As Outlook.MailItem
+Set Message = Outlook.CreateItem(olMailItem)
+With Message
+'You can display the message To debug And see state
+'.Display
+
+.Subject = Subject
+.Body = Message
+
+'Set destination email address
+.Recipients.Add (strMailto)
+
+'Set sender address If specified.
+Const olOriginator = 0
+IfLen(strMailfrom) > 0 Then .Recipients.Add
+(strMailfrom).Type = olOriginator
+
+'Send the message
+.Send
+End With
+End Function 
+
+
